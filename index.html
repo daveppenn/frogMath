@@ -1,0 +1,864 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Frog Hop Math!</title>
+  <style>
+    :root{
+      --bg:#e9fff2;
+      --panel:#ffffffcc;
+      --ink:#163a2b;
+      --accent:#2dd36f;
+      --danger:#ff4d4d;
+    }
+    body{
+      margin:0;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      background: linear-gradient(180deg,#c8f1ff, var(--bg));
+      color:var(--ink);
+      display:flex;
+      justify-content:center;
+      align-items:center;
+      min-height:100vh;
+    }
+    .wrap{
+      width:min(980px, 96vw);
+      display:grid;
+      grid-template-columns: 1.1fr 0.9fr;
+      gap:14px;
+      align-items:stretch;
+    }
+    canvas{
+      width:100%;
+      height:auto;
+      background: #b8f7c7;
+      border-radius:18px;
+      box-shadow: 0 12px 30px rgba(0,0,0,.12);
+      border: 2px solid rgba(0,0,0,.08);
+    }
+    .panel{
+      background: var(--panel);
+      border-radius:18px;
+      padding:14px;
+      box-shadow: 0 12px 30px rgba(0,0,0,.10);
+      border: 2px solid rgba(0,0,0,.06);
+      display:flex;
+      flex-direction:column;
+      gap:10px;
+    }
+    h1{
+      margin:0;
+      font-size:22px;
+      display:flex;
+      align-items:center;
+      gap:8px;
+    }
+    .sub{
+      font-size:13px;
+      opacity:.85;
+      margin-top:-6px;
+    }
+    .row{
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+      align-items:center;
+      justify-content:space-between;
+    }
+
+    .modeBox{
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+      align-items:center;
+    }
+
+    /* Simple segmented toggle */
+    .seg{
+      display:flex;
+      background:#ffffff;
+      border-radius:12px;
+      border:1px solid rgba(0,0,0,.12);
+      overflow:hidden;
+    }
+    .seg label{
+      padding:8px 10px;
+      cursor:pointer;
+      font-size:13px;
+      user-select:none;
+      white-space:nowrap;
+    }
+    .seg input{ display:none; }
+    .seg input:checked + span{
+      background: var(--accent);
+      color: #08301f;
+      font-weight:700;
+    }
+    .seg span{
+      display:inline-block;
+      padding:8px 10px;
+    }
+
+    .qBox{
+      background:#fff;
+      border-radius:16px;
+      padding:12px;
+      border:1px solid rgba(0,0,0,.10);
+    }
+    .question{
+      font-size:28px;
+      font-weight:800;
+      letter-spacing:.2px;
+    }
+    .tiny{
+      font-size:12px;
+      opacity:.8;
+    }
+    .inputRow{
+      display:flex;
+      gap:10px;
+      margin-top:10px;
+    }
+    input[type="number"]{
+      flex:1;
+      font-size:18px;
+      padding:10px;
+      border-radius:12px;
+      border:1px solid rgba(0,0,0,.18);
+      outline:none;
+    }
+    button{
+      font-size:16px;
+      padding:10px 12px;
+      border-radius:12px;
+      border:0;
+      background: var(--accent);
+      color:#0b2f21;
+      font-weight:800;
+      cursor:pointer;
+      box-shadow: 0 6px 0 rgba(0,0,0,.12);
+    }
+    button:active{ transform: translateY(2px); box-shadow: 0 4px 0 rgba(0,0,0,.12); }
+    button.secondary{
+      background:#fff;
+      border:1px solid rgba(0,0,0,.16);
+      box-shadow:none;
+      font-weight:700;
+    }
+
+    .stats{
+      display:grid;
+      grid-template-columns: 1fr 1fr;
+      gap:10px;
+    }
+    .pill{
+      background:#fff;
+      border-radius:14px;
+      padding:10px;
+      border:1px solid rgba(0,0,0,.10);
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      font-weight:700;
+    }
+    .bar{
+      height:10px;
+      background: rgba(0,0,0,.08);
+      border-radius:999px;
+      overflow:hidden;
+      margin-top:8px;
+    }
+    .bar > div{
+      height:100%;
+      width:50%;
+      background: linear-gradient(90deg, var(--accent), #ffd166);
+    }
+    .msg{
+      min-height:34px;
+      font-weight:800;
+      padding:10px 12px;
+      border-radius:14px;
+      background:#fff;
+      border:1px dashed rgba(0,0,0,.18);
+    }
+    .msg.good{ border-color: rgba(45,211,111,.9); }
+    .msg.bad{ border-color: rgba(255,77,77,.9); color:#7c1a1a; }
+    .footer{
+      display:flex;
+      gap:10px;
+      justify-content:space-between;
+      flex-wrap:wrap;
+      align-items:center;
+    }
+    .smallLink{
+      font-size:12px;
+      opacity:.75;
+    }
+    .kbd{
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+      font-size:12px;
+      padding:2px 6px;
+      border-radius:8px;
+      background: rgba(0,0,0,.06);
+      border:1px solid rgba(0,0,0,.10);
+    }
+
+    @media (max-width: 860px){
+      .wrap{ grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <canvas id="game" width="900" height="520" aria-label="Frog crossing game"></canvas>
+
+    <div class="panel">
+      <div>
+        <h1>🐸 Frog Hop Math!</h1>
+        <div class="sub">Answer to hop forward. Get <b>10</b> right to cross. Wrong answers make cars go ZOOM. Too slow? …SPLAT.</div>
+      </div>
+
+      <div class="row">
+        <div class="modeBox">
+          <div class="seg" title="Choose a math mode">
+            <label>
+              <input type="radio" name="mode" value="add1" checked />
+              <span>➕ 1-digit add</span>
+            </label>
+            <label>
+              <input type="radio" name="mode" value="sub1" />
+              <span>➖ 1-digit sub</span>
+            </label>
+            <label>
+              <input type="radio" name="mode" value="mix2" />
+              <span>🔀 2-digit +/−</span>
+            </label>
+          </div>
+        </div>
+        <button class="secondary" id="soundBtn" title="Tap once to enable sound on some browsers">🔊 Sound: ON</button>
+      </div>
+
+      <div class="qBox">
+        <div class="question" id="question">3 + 4 = ?</div>
+        <div class="tiny">Tip: press <span class="kbd">Enter</span> to submit.</div>
+        <div class="inputRow">
+          <input id="answer" type="number" inputmode="numeric" autocomplete="off" placeholder="Type answer…" />
+          <button id="goBtn">Hop!</button>
+        </div>
+        <div class="bar" title="Time left">
+          <div id="timeFill"></div>
+        </div>
+      </div>
+
+      <div class="stats">
+        <div class="pill"><span>✅ Correct</span><span id="correct">0 / 10</span></div>
+        <div class="pill"><span>🚗 Car Speed</span><span id="speed">1.0x</span></div>
+        <div class="pill"><span>⏱️ Time Limit</span><span id="limit">6.0s</span></div>
+        <div class="pill"><span>🏁 Progress</span><span id="hop">0%</span></div>
+      </div>
+
+      <div class="msg" id="msg">Let’s go! Help the frog cross the road.</div>
+
+      <div class="footer">
+        <button class="secondary" id="resetBtn">🔁 Reset</button>
+        <div class="smallLink">Hosting tip: GitHub repo → Settings → Pages → Deploy from branch → <b>/ (root)</b>.</div>
+      </div>
+    </div>
+  </div>
+
+<script>
+(() => {
+  // ---------- Utilities ----------
+  const randInt = (a,b)=> Math.floor(Math.random()*(b-a+1))+a;
+  const clamp = (v,min,max)=> Math.max(min, Math.min(max,v));
+
+  // ---------- Audio (simple + silly) ----------
+  let audioOn = true;
+  let audioCtx = null;
+
+  function ensureAudio(){
+    if (!audioOn) return null;
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === "suspended") audioCtx.resume();
+    return audioCtx;
+  }
+
+  function beep(freq=440, dur=0.09, type="square", gain=0.06){
+    const ctx = ensureAudio(); if(!ctx) return;
+    const o = ctx.createOscillator();
+    const g = ctx.createGain();
+    o.type = type;
+    o.frequency.value = freq;
+    g.gain.value = gain;
+    o.connect(g); g.connect(ctx.destination);
+    o.start();
+    o.stop(ctx.currentTime + dur);
+  }
+
+  function ribbit(){
+    // descending goofy "rib-bit"
+    beep(520, 0.06, "sine", 0.07);
+    setTimeout(()=>beep(420, 0.08, "sine", 0.07), 70);
+    setTimeout(()=>beep(320, 0.10, "triangle", 0.06), 140);
+  }
+
+  function zoom(){
+    // quick rising whoosh
+    const ctx = ensureAudio(); if(!ctx) return;
+    const o = ctx.createOscillator();
+    const g = ctx.createGain();
+    o.type = "sawtooth";
+    const now = ctx.currentTime;
+    o.frequency.setValueAtTime(180, now);
+    o.frequency.exponentialRampToValueAtTime(1100, now + 0.18);
+    g.gain.setValueAtTime(0.001, now);
+    g.gain.exponentialRampToValueAtTime(0.08, now + 0.03);
+    g.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
+    o.connect(g); g.connect(ctx.destination);
+    o.start(now);
+    o.stop(now + 0.2);
+  }
+
+  function splatSound(){
+    // noisy "splat"
+    const ctx = ensureAudio(); if(!ctx) return;
+    const bufferSize = 2 * ctx.sampleRate * 0.15;
+    const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i=0;i<bufferSize;i++){
+      const t = i / bufferSize;
+      data[i] = (Math.random()*2-1) * (1 - t) * 0.9;
+    }
+    const noise = ctx.createBufferSource();
+    noise.buffer = buffer;
+    const g = ctx.createGain();
+    g.gain.value = 0.12;
+    const filter = ctx.createBiquadFilter();
+    filter.type = "lowpass";
+    filter.frequency.value = 800;
+    noise.connect(filter); filter.connect(g); g.connect(ctx.destination);
+    noise.start();
+    // add a comedic "plop"
+    setTimeout(()=>beep(140, 0.11, "square", 0.08), 40);
+  }
+
+  // ---------- Canvas game ----------
+  const canvas = document.getElementById("game");
+  const ctx = canvas.getContext("2d");
+
+  const UI = {
+    q: document.getElementById("question"),
+    a: document.getElementById("answer"),
+    msg: document.getElementById("msg"),
+    correct: document.getElementById("correct"),
+    speed: document.getElementById("speed"),
+    limit: document.getElementById("limit"),
+    hop: document.getElementById("hop"),
+    go: document.getElementById("goBtn"),
+    reset: document.getElementById("resetBtn"),
+    timeFill: document.getElementById("timeFill"),
+    soundBtn: document.getElementById("soundBtn"),
+    modeRadios: [...document.querySelectorAll('input[name="mode"]')],
+  };
+
+  const state = {
+    mode: "add1",
+    correctCount: 0,
+    needed: 10,
+    carSpeedMult: 1.0,
+    baseCarSpeed: 130, // px/s
+    timeLimit: 6.0,    // seconds
+    timeLeft: 6.0,
+    running: true,
+    splatted: false,
+    win: false,
+    lastT: performance.now(),
+    question: null,
+    cars: [],
+    splat: { active:false, x:0, y:0, life:0 },
+  };
+
+  // Lanes in the road (3 lanes)
+  const world = {
+    grassTopY: 60,
+    roadTopY: 150,
+    roadH: 240,
+    grassBottomY: 430,
+    frogStartX: 90,
+    frogGoalX: 810,
+    frogY: 390,
+    hopSteps: 10,
+  };
+
+  function setMessage(text, kind=""){
+    UI.msg.textContent = text;
+    UI.msg.className = "msg" + (kind ? " " + kind : "");
+  }
+
+  function updateStats(){
+    UI.correct.textContent = `${state.correctCount} / ${state.needed}`;
+    UI.speed.textContent = `${state.carSpeedMult.toFixed(1)}x`;
+    UI.limit.textContent = `${state.timeLimit.toFixed(1)}s`;
+    const pct = Math.round((state.correctCount/state.needed)*100);
+    UI.hop.textContent = `${pct}%`;
+  }
+
+  function frogX(){
+    const t = state.correctCount / state.needed;
+    return world.frogStartX + (world.frogGoalX - world.frogStartX) * t;
+  }
+
+  function resetCars(){
+    state.cars = [];
+    // 3 lanes, alternating directions
+    const lanes = [
+      { y: world.roadTopY + 55, dir:  1 },
+      { y: world.roadTopY + 120, dir: -1 },
+      { y: world.roadTopY + 185, dir:  1 },
+    ];
+    for (let i=0;i<6;i++){
+      const lane = lanes[i % lanes.length];
+      const w = randInt(70, 120);
+      const x = randInt(0, canvas.width);
+      state.cars.push({
+        laneY: lane.y,
+        dir: lane.dir,
+        x,
+        w,
+        h: 36,
+        hue: randInt(0, 360),
+        goofy: Math.random() < 0.5,
+      });
+    }
+  }
+
+  function resetGame(){
+    state.correctCount = 0;
+    state.carSpeedMult = 1.0;
+    state.timeLimit = 6.0;
+    state.timeLeft = state.timeLimit;
+    state.running = true;
+    state.splatted = false;
+    state.win = false;
+    state.splat.active = false;
+    resetCars();
+    makeQuestion();
+    updateStats();
+    setMessage("Let’s go! Help the frog cross the road.");
+    UI.a.value = "";
+    UI.a.focus();
+  }
+
+  // ---------- Math question generation ----------
+  function makeQuestion(){
+    const mode = state.mode;
+    let a,b,op,ans;
+
+    if (mode === "add1"){
+      a = randInt(0,9); b = randInt(0,9); op = "+";
+      ans = a + b;
+    } else if (mode === "sub1"){
+      // keep it non-negative
+      a = randInt(0,9); b = randInt(0,9);
+      if (b > a) [a,b] = [b,a];
+      op = "−";
+      ans = a - b;
+    } else { // mix2
+      op = Math.random() < 0.5 ? "+" : "−";
+      if (op === "+"){
+        a = randInt(10,99); b = randInt(10,99);
+        ans = a + b;
+      } else {
+        a = randInt(10,99); b = randInt(10,99);
+        if (b > a) [a,b] = [b,a];
+        ans = a - b;
+      }
+    }
+
+    state.question = { a,b,op,ans };
+    UI.q.textContent = `${a} ${op} ${b} = ?`;
+    state.timeLeft = state.timeLimit;
+  }
+
+  function onCorrect(){
+    ribbit();
+    state.correctCount++;
+    updateStats();
+    if (state.correctCount >= state.needed){
+      state.win = true;
+      state.running = false;
+      setMessage("🎉 YOU DID IT! The frog made it across! 🐸🏁", "good");
+      // victory jingle
+      beep(660,0.09,"sine",0.08); setTimeout(()=>beep(880,0.12,"sine",0.08), 120);
+      return;
+    }
+    setMessage("Nice! Hop hop hop! 🐸", "good");
+    makeQuestion();
+  }
+
+  function onWrong(reasonText="Oops!"){
+    zoom();
+    // Cars speed up and time gets a bit tighter (but not too harsh)
+    state.carSpeedMult = clamp(state.carSpeedMult + 0.2, 1.0, 3.5);
+    state.timeLimit = clamp(state.timeLimit - 0.2, 3.0, 7.0);
+    state.timeLeft = state.timeLimit;
+    updateStats();
+    setMessage(`${reasonText} Cars go faster! 🚗💨`, "bad");
+    // new question so it doesn't feel stuck
+    makeQuestion();
+  }
+
+  function splatFrog(){
+    if (state.splatted || state.win) return;
+    state.splatted = true;
+    state.running = false;
+    state.splat.active = true;
+    state.splat.life = 1.3; // seconds
+    state.splat.x = frogX();
+    state.splat.y = world.frogY;
+    splatSound();
+    setMessage("SPLAT!! 🫠 The frog became frog-jam. Press Reset to try again!", "bad");
+  }
+
+  function submitAnswer(){
+    if (!state.running) return;
+    const val = UI.a.value.trim();
+    if (val === "") return;
+    const n = Number(val);
+    UI.a.value = "";
+    if (!Number.isFinite(n)) return;
+
+    if (n === state.question.ans){
+      onCorrect();
+    } else {
+      onWrong(`Nope! It was ${state.question.ans}.`);
+    }
+    UI.a.focus();
+  }
+
+  // ---------- Drawing ----------
+  function drawSkyAndGrass(){
+    // background already via canvas CSS, but paint a little scenery
+    // top grass
+    ctx.fillStyle = "#7ee28d";
+    ctx.fillRect(0, 0, canvas.width, world.roadTopY);
+
+    // bottom grass
+    ctx.fillStyle = "#76dd88";
+    ctx.fillRect(0, world.roadTopY + world.roadH, canvas.width, canvas.height - (world.roadTopY + world.roadH));
+
+    // little flowers
+    for (let i=0;i<14;i++){
+      const x = (i * 63 + 30) % canvas.width;
+      const y = 30 + (i%3)*18;
+      ctx.fillStyle = ["#ff6b6b","#ffd166","#4dabf7"][i%3];
+      ctx.beginPath(); ctx.arc(x, y, 4, 0, Math.PI*2); ctx.fill();
+      ctx.fillStyle = "#2f9e44";
+      ctx.fillRect(x-1, y+4, 2, 10);
+    }
+
+    // finish line (goal)
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(world.frogGoalX+20, world.roadTopY-20, 8, world.roadH+40);
+    // checker squares
+    for (let i=0;i<18;i++){
+      ctx.fillStyle = i%2 ? "#111" : "#fff";
+      ctx.fillRect(world.frogGoalX+28, world.roadTopY-20 + i* (world.roadH+40)/18, 12, 16);
+    }
+
+    // start lily pad
+    ctx.fillStyle = "#2f9e44";
+    ctx.beginPath();
+    ctx.ellipse(world.frogStartX-25, world.frogY+25, 40, 14, 0, 0, Math.PI*2);
+    ctx.fill();
+  }
+
+  function drawRoad(){
+    // road
+    ctx.fillStyle = "#3a3a3a";
+    ctx.fillRect(0, world.roadTopY, canvas.width, world.roadH);
+
+    // lane lines
+    ctx.strokeStyle = "rgba(255,255,255,0.65)";
+    ctx.lineWidth = 4;
+    ctx.setLineDash([18, 14]);
+    for (let i=1;i<=2;i++){
+      const y = world.roadTopY + (world.roadH/3)*i;
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      ctx.lineTo(canvas.width, y);
+      ctx.stroke();
+    }
+    ctx.setLineDash([]);
+
+    // curb lines
+    ctx.strokeStyle = "rgba(255,255,255,0.35)";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(0, world.roadTopY+2);
+    ctx.lineTo(canvas.width, world.roadTopY+2);
+    ctx.moveTo(0, world.roadTopY+world.roadH-2);
+    ctx.lineTo(canvas.width, world.roadTopY+world.roadH-2);
+    ctx.stroke();
+  }
+
+  function drawCar(car){
+    const x = car.x, y = car.laneY;
+    // body
+    ctx.fillStyle = `hsl(${car.hue} 85% 55%)`;
+    const rx = x, ry = y;
+    const w = car.w, h = car.h;
+
+    roundRect(rx, ry, w, h, 10, true);
+
+    // windshield
+    ctx.fillStyle = "rgba(255,255,255,0.55)";
+    roundRect(rx + w*0.62, ry + 6, w*0.28, h-12, 8, true);
+
+    // wheels
+    ctx.fillStyle = "#111";
+    ctx.beginPath(); ctx.arc(rx + 18, ry + h, 9, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(rx + w - 18, ry + h, 9, 0, Math.PI*2); ctx.fill();
+
+    // silly face
+    if (car.goofy){
+      ctx.fillStyle = "rgba(0,0,0,0.75)";
+      ctx.beginPath(); ctx.arc(rx + w*0.18, ry + h*0.45, 4, 0, Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.arc(rx + w*0.28, ry + h*0.45, 4, 0, Math.PI*2); ctx.fill();
+      ctx.strokeStyle = "rgba(0,0,0,0.6)";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(rx + w*0.24, ry + h*0.60, 10, 0, Math.PI);
+      ctx.stroke();
+    }
+  }
+
+  function roundRect(x, y, w, h, r, fill){
+    const rr = Math.min(r, w/2, h/2);
+    ctx.beginPath();
+    ctx.moveTo(x+rr, y);
+    ctx.arcTo(x+w, y, x+w, y+h, rr);
+    ctx.arcTo(x+w, y+h, x, y+h, rr);
+    ctx.arcTo(x, y+h, x, y, rr);
+    ctx.arcTo(x, y, x+w, y, rr);
+    if (fill) ctx.fill();
+  }
+
+  function drawFrog(){
+    const x = frogX();
+    const y = world.frogY;
+    const alive = !state.splatted;
+
+    if (!alive) return; // splat draws separately
+
+    // shadow
+    ctx.fillStyle = "rgba(0,0,0,0.15)";
+    ctx.beginPath();
+    ctx.ellipse(x, y+28, 26, 10, 0, 0, Math.PI*2);
+    ctx.fill();
+
+    // body
+    ctx.fillStyle = "#2dd36f";
+    ctx.beginPath();
+    ctx.ellipse(x, y+10, 26, 22, 0, 0, Math.PI*2);
+    ctx.fill();
+
+    // belly
+    ctx.fillStyle = "rgba(255,255,255,0.55)";
+    ctx.beginPath();
+    ctx.ellipse(x, y+16, 16, 12, 0, 0, Math.PI*2);
+    ctx.fill();
+
+    // eyes
+    ctx.fillStyle = "#2dd36f";
+    ctx.beginPath();
+    ctx.arc(x-14, y-6, 10, 0, Math.PI*2);
+    ctx.arc(x+14, y-6, 10, 0, Math.PI*2);
+    ctx.fill();
+
+    ctx.fillStyle = "#fff";
+    ctx.beginPath();
+    ctx.arc(x-14, y-6, 6, 0, Math.PI*2);
+    ctx.arc(x+14, y-6, 6, 0, Math.PI*2);
+    ctx.fill();
+
+    ctx.fillStyle = "#111";
+    ctx.beginPath();
+    ctx.arc(x-12, y-6, 2.6, 0, Math.PI*2);
+    ctx.arc(x+16, y-6, 2.6, 0, Math.PI*2);
+    ctx.fill();
+
+    // smile
+    ctx.strokeStyle = "rgba(0,0,0,0.55)";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(x, y+16, 10, 0, Math.PI);
+    ctx.stroke();
+  }
+
+  function drawSplat(){
+    if (!state.splat.active) return;
+    const {x,y,life} = state.splat;
+    const t = clamp(life / 1.3, 0, 1);
+
+    // splat puddle
+    ctx.save();
+    ctx.globalAlpha = clamp(1.2 - (1 - t)*1.2, 0.2, 1); // stays visible
+    ctx.fillStyle = "#ff4d4d";
+    ctx.beginPath();
+    ctx.ellipse(x, y+22, 46, 18, 0, 0, Math.PI*2);
+    ctx.fill();
+
+    // blobs
+    ctx.fillStyle = "#ff6b6b";
+    for (let i=0;i<10;i++){
+      const ang = (i/10)*Math.PI*2;
+      const rr = 26 + (i%3)*8;
+      const bx = x + Math.cos(ang)*rr;
+      const by = y+18 + Math.sin(ang)*rr*0.6;
+      ctx.beginPath();
+      ctx.arc(bx, by, 6 + (i%4), 0, Math.PI*2);
+      ctx.fill();
+    }
+
+    // text
+    ctx.globalAlpha = 0.95;
+    ctx.fillStyle = "#111";
+    ctx.font = "900 34px system-ui, sans-serif";
+    ctx.fillText("SPLAT!", x-70, y-25);
+    ctx.restore();
+  }
+
+  function drawHUD(){
+    // little banner on the scene
+    ctx.fillStyle = "rgba(255,255,255,0.75)";
+    roundRect(16, 14, 330, 44, 14, true);
+    ctx.fillStyle = "#163a2b";
+    ctx.font = "800 18px system-ui, sans-serif";
+    ctx.fillText(`Get 10 right to cross!`, 30, 42);
+
+    // progress hops
+    ctx.fillStyle = "rgba(255,255,255,0.75)";
+    roundRect(360, 14, 520, 44, 14, true);
+    const p = state.correctCount / state.needed;
+    ctx.fillStyle = "#2dd36f";
+    roundRect(372, 26, 496*p, 20, 10, true);
+    ctx.strokeStyle = "rgba(0,0,0,0.12)";
+    ctx.lineWidth = 1;
+    ctx.strokeRect(372, 26, 496, 20);
+
+    ctx.fillStyle = "#163a2b";
+    ctx.font = "800 14px system-ui, sans-serif";
+    ctx.fillText(`${Math.round(p*100)}%`, 850, 41);
+  }
+
+  // ---------- Update loop ----------
+  function tick(now){
+    const dt = (now - state.lastT) / 1000;
+    state.lastT = now;
+
+    // time bar
+    if (state.running){
+      state.timeLeft -= dt;
+      if (state.timeLeft <= 0){
+        // time's up — frog gets splatted
+        splatFrog();
+      }
+    }
+
+    // update splat life
+    if (state.splat.active){
+      state.splat.life -= dt;
+      if (state.splat.life <= 0){
+        // keep the splat visible, but stop anim life
+        state.splat.active = true;
+        state.splat.life = 0;
+      }
+    }
+
+    // move cars
+    const speed = state.baseCarSpeed * state.carSpeedMult;
+    for (const car of state.cars){
+      car.x += car.dir * speed * dt;
+
+      // wrap around
+      if (car.dir === 1 && car.x > canvas.width + 140) car.x = -car.w - randInt(40,180);
+      if (car.dir === -1 && car.x < -car.w - 140) car.x = canvas.width + randInt(40,180);
+
+      // collision check only if frog is alive and game running
+      if (state.running && !state.splatted){
+        const fx = frogX(), fy = world.frogY;
+        const frogBox = { x: fx-22, y: fy-10, w: 44, h: 44 };
+        const carBox  = { x: car.x,  y: car.laneY, w: car.w, h: car.h+10 };
+        if (rectOverlap(frogBox, carBox) && fy > world.roadTopY && fy < world.roadTopY + world.roadH){
+          splatFrog();
+        }
+      }
+    }
+
+    // draw
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    drawSkyAndGrass();
+    drawRoad();
+
+    // hint zones: frog is always near bottom lane area visually; road is in middle
+    // draw cars
+    for (const car of state.cars) drawCar(car);
+
+    drawHUD();
+
+    // frog sits just under road visually; simple vibe
+    // (We keep frogY constant. Progress is across X.)
+    if (!state.splatted) drawFrog();
+    drawSplat();
+
+    // update time bar UI
+    const t = clamp(state.timeLeft / state.timeLimit, 0, 1);
+    UI.timeFill.style.width = `${t*100}%`;
+
+    requestAnimationFrame(tick);
+  }
+
+  function rectOverlap(a,b){
+    return (a.x < b.x + b.w &&
+            a.x + a.w > b.x &&
+            a.y < b.y + b.h &&
+            a.y + a.h > b.y);
+  }
+
+  // ---------- Events ----------
+  UI.go.addEventListener("click", submitAnswer);
+  UI.a.addEventListener("keydown", (e)=>{
+    if (e.key === "Enter") submitAnswer();
+  });
+  UI.reset.addEventListener("click", resetGame);
+
+  UI.modeRadios.forEach(r => r.addEventListener("change", ()=>{
+    const checked = UI.modeRadios.find(x=>x.checked);
+    state.mode = checked ? checked.value : "add1";
+    // small reset of just question/time; keep progress? better for kids: full reset
+    resetGame();
+  }));
+
+  UI.soundBtn.addEventListener("click", ()=>{
+    audioOn = !audioOn;
+    UI.soundBtn.textContent = audioOn ? "🔊 Sound: ON" : "🔇 Sound: OFF";
+    if (audioOn) { ensureAudio(); beep(660,0.06,"sine",0.06); }
+  });
+
+  // Clicking/tapping canvas also unlocks audio on some browsers
+  canvas.addEventListener("pointerdown", ()=>{
+    ensureAudio();
+  });
+
+  // ---------- Start ----------
+  resetGame();
+  updateStats();
+  requestAnimationFrame(tick);
+
+})();
+</script>
+</body>
+</html>
