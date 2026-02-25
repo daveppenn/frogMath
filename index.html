@@ -117,3 +117,732 @@
       background: var(--accent);
       color:#0b2f21;
       font-weight:900;
+      cursor:pointer;
+      box-shadow: 0 6px 0 rgba(0,0,0,.12);
+    }
+    button:active{ transform: translateY(2px); box-shadow: 0 4px 0 rgba(0,0,0,.12); }
+    button.secondary{
+      background:#fff;
+      border:1px solid rgba(0,0,0,.16);
+      box-shadow:none;
+      font-weight:800;
+    }
+
+    .stats{
+      display:grid;
+      grid-template-columns: 1fr 1fr;
+      gap:10px;
+    }
+    .pill{
+      background:#fff;
+      border-radius:14px;
+      padding:10px;
+      border:1px solid rgba(0,0,0,.10);
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      font-weight:800;
+    }
+    .bar{
+      height:10px;
+      background: rgba(0,0,0,.08);
+      border-radius:999px;
+      overflow:hidden;
+      margin-top:10px;
+    }
+    .bar > div{
+      height:100%;
+      width:50%;
+      background: linear-gradient(90deg, var(--accent), #ffd166);
+    }
+    .msg{
+      min-height:34px;
+      font-weight:900;
+      padding:10px 12px;
+      border-radius:14px;
+      background:#fff;
+      border:1px dashed rgba(0,0,0,.18);
+    }
+    .msg.good{ border-color: rgba(45,211,111,.9); }
+    .msg.bad{ border-color: rgba(255,77,77,.9); color:#7c1a1a; }
+    .footer{
+      display:flex;
+      gap:10px;
+      justify-content:space-between;
+      flex-wrap:wrap;
+      align-items:center;
+    }
+    .smallLink{ font-size:12px; opacity:.75; }
+    @media (max-width: 860px){
+      .wrap{ grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <canvas id="game" width="900" height="520"></canvas>
+
+    <div class="panel">
+      <div>
+        <h1>🐸 Frog Hop Math!</h1>
+        <div class="sub">Pick the right answer to hop <b>across</b> the road. Get <b>10</b> right to win. Wrong answers make cars go ZOOM. Too slow? …SPLAT.</div>
+      </div>
+
+      <div class="row">
+        <div class="seg" title="Choose a math mode">
+          <label><input type="radio" name="mode" value="add1" checked /><span>➕ 1-digit add</span></label>
+          <label><input type="radio" name="mode" value="sub1" /><span>➖ 1-digit sub</span></label>
+          <label><input type="radio" name="mode" value="mix2" /><span>🔀 2-digit +/−</span></label>
+        </div>
+        <button class="secondary" id="soundBtn">🔊 Sound: ON</button>
+      </div>
+
+      <div class="qBox">
+        <div class="question" id="question">3 + 4 = ?</div>
+
+        <div class="choices" id="choices">
+          <button class="choice" data-i="0">7</button>
+          <button class="choice" data-i="1">6</button>
+          <button class="choice" data-i="2">8</button>
+          <button class="choice" data-i="3">9</button>
+        </div>
+
+        <div class="bar" title="Time left">
+          <div id="timeFill"></div>
+        </div>
+      </div>
+
+      <div class="stats">
+        <div class="pill"><span>✅ Correct</span><span id="correct">0 / 10</span></div>
+        <div class="pill"><span>🚗 Car Speed</span><span id="speed">1.0x</span></div>
+        <div class="pill"><span>⏱️ Time Limit</span><span id="limit">6.0s</span></div>
+        <div class="pill"><span>🏁 Progress</span><span id="hop">0%</span></div>
+      </div>
+
+      <div class="msg" id="msg">Let’s go! Help the frog cross the road.</div>
+
+      <div class="footer">
+        <button class="secondary" id="resetBtn">🔁 Reset</button>
+        <div class="smallLink">GitHub Pages: Repo → Settings → Pages → Deploy from branch → <b>/ (root)</b>.</div>
+      </div>
+    </div>
+  </div>
+
+<script>
+(() => {
+  // ---------- Helpers ----------
+  const randInt = (a,b)=> Math.floor(Math.random()*(b-a+1))+a;
+  const clamp = (v,min,max)=> Math.max(min, Math.min(max,v));
+  const shuffle = (arr)=>{
+    for (let i=arr.length-1;i>0;i--){
+      const j = Math.floor(Math.random()*(i+1));
+      [arr[i],arr[j]] = [arr[j],arr[i]];
+    }
+    return arr;
+  };
+
+  // ---------- Audio ----------
+  let audioOn = true;
+  let audioCtx = null;
+
+  function ensureAudio(){
+    if (!audioOn) return null;
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === "suspended") audioCtx.resume();
+    return audioCtx;
+  }
+  function beep(freq=440, dur=0.09, type="square", gain=0.06){
+    const ctx = ensureAudio(); if(!ctx) return;
+    const o = ctx.createOscillator();
+    const g = ctx.createGain();
+    o.type = type;
+    o.frequency.value = freq;
+    g.gain.value = gain;
+    o.connect(g); g.connect(ctx.destination);
+    o.start();
+    o.stop(ctx.currentTime + dur);
+  }
+  function ribbit(){
+    beep(520, 0.06, "sine", 0.07);
+    setTimeout(()=>beep(420, 0.08, "sine", 0.07), 70);
+    setTimeout(()=>beep(320, 0.10, "triangle", 0.06), 140);
+  }
+  function zoom(){
+    const ctx = ensureAudio(); if(!ctx) return;
+    const o = ctx.createOscillator();
+    const g = ctx.createGain();
+    o.type = "sawtooth";
+    const now = ctx.currentTime;
+    o.frequency.setValueAtTime(180, now);
+    o.frequency.exponentialRampToValueAtTime(1200, now + 0.18);
+    g.gain.setValueAtTime(0.001, now);
+    g.gain.exponentialRampToValueAtTime(0.08, now + 0.03);
+    g.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
+    o.connect(g); g.connect(ctx.destination);
+    o.start(now);
+    o.stop(now + 0.2);
+  }
+  function splatSound(){
+    const ctx = ensureAudio(); if(!ctx) return;
+    const bufferSize = 2 * ctx.sampleRate * 0.15;
+    const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i=0;i<bufferSize;i++){
+      const t = i / bufferSize;
+      data[i] = (Math.random()*2-1) * (1 - t) * 0.9;
+    }
+    const noise = ctx.createBufferSource();
+    noise.buffer = buffer;
+    const g = ctx.createGain();
+    g.gain.value = 0.12;
+    const filter = ctx.createBiquadFilter();
+    filter.type = "lowpass";
+    filter.frequency.value = 800;
+    noise.connect(filter); filter.connect(g); g.connect(ctx.destination);
+    noise.start();
+    setTimeout(()=>beep(140, 0.11, "square", 0.08), 40);
+  }
+
+  // ---------- DOM ----------
+  const canvas = document.getElementById("game");
+  const g = canvas.getContext("2d");
+
+  const UI = {
+    q: document.getElementById("question"),
+    msg: document.getElementById("msg"),
+    correct: document.getElementById("correct"),
+    speed: document.getElementById("speed"),
+    limit: document.getElementById("limit"),
+    hop: document.getElementById("hop"),
+    timeFill: document.getElementById("timeFill"),
+    reset: document.getElementById("resetBtn"),
+    soundBtn: document.getElementById("soundBtn"),
+    choicesWrap: document.getElementById("choices"),
+    choiceBtns: [...document.querySelectorAll(".choice")],
+    modeRadios: [...document.querySelectorAll('input[name="mode"]')],
+  };
+
+  // ---------- World / State ----------
+  const state = {
+    mode: "add1",
+    correctCount: 0,
+    needed: 10,
+    carSpeedMult: 1.0,
+    baseCarSpeed: 155,
+    timeLimit: 6.0,
+    timeLeft: 6.0,
+    running: true,
+    splatted: false,
+    win: false,
+    lastT: performance.now(),
+    question: null,
+    choices: [],
+    correctIndex: 0,
+    cars: [],
+    splat: { active:false, x:0, y:0, life:0 },
+    hopAnim: { active:false, t:0, fromY:0, toY:0 },
+    lockChoices: false,
+  };
+
+  // More lanes, frog hops ACROSS (bottom -> top)
+  const world = {
+    topGrassH: 70,
+    bottomGrassH: 80,
+    roadTopY: 90,
+    roadH: 320,
+    lanes: 5,
+    laneH: 320/5,
+    frogX: 120,
+    frogStartY: 520 - 80 + 18,  // in bottom grass
+    frogGoalY: 44,              // in top grass
+    hopSteps: 10,               // 10 correct
+  };
+
+  function setMessage(text, kind=""){
+    UI.msg.textContent = text;
+    UI.msg.className = "msg" + (kind ? " " + kind : "");
+  }
+  function updateStats(){
+    UI.correct.textContent = `${state.correctCount} / ${state.needed}`;
+    UI.speed.textContent = `${state.carSpeedMult.toFixed(1)}x`;
+    UI.limit.textContent = `${state.timeLimit.toFixed(1)}s`;
+    UI.hop.textContent = `${Math.round((state.correctCount/state.needed)*100)}%`;
+  }
+
+  // Frog Y based on progress, with a tiny hop animation
+  function frogY(){
+    const base = world.frogStartY - (world.frogStartY - world.frogGoalY) * (state.correctCount / state.needed);
+    if (!state.hopAnim.active) return base;
+    // hop arc
+    const t = state.hopAnim.t;
+    const y = state.hopAnim.fromY + (state.hopAnim.toY - state.hopAnim.fromY) * t;
+    const arc = Math.sin(Math.PI * t) * 18; // little bounce
+    return y - arc;
+  }
+
+  function laneIndexForY(y){
+    // lanes span roadTopY .. roadTopY+roadH
+    if (y < world.roadTopY || y > world.roadTopY + world.roadH) return -1;
+    const i = Math.floor((y - world.roadTopY) / world.laneH);
+    return clamp(i, 0, world.lanes-1);
+  }
+
+  function resetCars(){
+    state.cars = [];
+    for (let lane=0; lane<world.lanes; lane++){
+      const dir = (lane % 2 === 0) ? 1 : -1;
+      const laneY = world.roadTopY + lane*world.laneH + (world.laneH*0.5 - 18);
+      const carsPerLane = 2; // total 10 cars across 5 lanes
+      for (let c=0;c<carsPerLane;c++){
+        const w = randInt(70, 130);
+        state.cars.push({
+          lane,
+          laneY,
+          dir,
+          x: randInt(0, canvas.width),
+          w,
+          h: 36,
+          hue: randInt(0, 360),
+          goofy: Math.random() < 0.55,
+        });
+      }
+    }
+  }
+
+  // ---------- Questions + Multiple Choice ----------
+  function makeQuestion(){
+    const mode = state.mode;
+    let a,b,op,ans;
+
+    if (mode === "add1"){
+      a = randInt(0,9); b = randInt(0,9); op = "+";
+      ans = a + b;
+    } else if (mode === "sub1"){
+      a = randInt(0,9); b = randInt(0,9);
+      if (b > a) [a,b] = [b,a];
+      op = "−";
+      ans = a - b;
+    } else { // mix2
+      op = Math.random() < 0.5 ? "+" : "−";
+      if (op === "+"){
+        a = randInt(10,99); b = randInt(10,99);
+        ans = a + b;
+      } else {
+        a = randInt(10,99); b = randInt(10,99);
+        if (b > a) [a,b] = [b,a];
+        ans = a - b;
+      }
+    }
+
+    state.question = { a,b,op,ans };
+    UI.q.textContent = `${a} ${op} ${b} = ?`;
+    state.timeLeft = state.timeLimit;
+
+    // generate 3 wrong answers near the true one (unique)
+    const set = new Set([ans]);
+    while (set.size < 4){
+      const wiggle = randInt(-9, 9);
+      let cand = ans + wiggle;
+      if (cand === ans) cand = ans + (Math.random()<0.5 ? -1 : 1);
+      // keep reasonable (non-negative for kid friendliness)
+      cand = Math.max(0, cand);
+      set.add(cand);
+    }
+    const arr = shuffle([...set]);
+    state.choices = arr;
+    state.correctIndex = arr.indexOf(ans);
+
+    // render buttons
+    UI.choiceBtns.forEach((btn,i)=>{
+      btn.textContent = arr[i];
+      btn.classList.remove("good","bad");
+      btn.disabled = false;
+    });
+    state.lockChoices = false;
+  }
+
+  function markChoices(correctIdx, pickedIdx){
+    UI.choiceBtns.forEach((btn,i)=>{
+      if (i === correctIdx) btn.classList.add("good");
+      if (i === pickedIdx && i !== correctIdx) btn.classList.add("bad");
+      btn.disabled = true;
+    });
+  }
+
+  function startHopAnimation(){
+    const from = frogY();
+    // target y after increment (using new correctCount value)
+    const toBase = world.frogStartY - (world.frogStartY - world.frogGoalY) * (state.correctCount / state.needed);
+    state.hopAnim = { active:true, t:0, fromY: from, toY: toBase };
+  }
+
+  function onCorrect(){
+    ribbit();
+    state.correctCount++;
+    updateStats();
+    startHopAnimation();
+
+    if (state.correctCount >= state.needed){
+      state.win = true;
+      state.running = false;
+      setMessage("🎉 YOU DID IT! The frog made it across! 🐸🏁", "good");
+      beep(660,0.09,"sine",0.08); setTimeout(()=>beep(880,0.12,"sine",0.08), 120);
+      return;
+    }
+    setMessage("Nice! HOP! 🐸", "good");
+    setTimeout(makeQuestion, 450);
+  }
+
+  function onWrong(reasonText="Oops!"){
+    zoom();
+    state.carSpeedMult = clamp(state.carSpeedMult + 0.25, 1.0, 4.0);
+    state.timeLimit = clamp(state.timeLimit - 0.25, 2.8, 7.0);
+    state.timeLeft = state.timeLimit;
+    updateStats();
+    setMessage(`${reasonText} Cars go faster! 🚗💨`, "bad");
+    setTimeout(makeQuestion, 650);
+  }
+
+  function splatFrog(){
+    if (state.splatted || state.win) return;
+    state.splatted = true;
+    state.running = false;
+    state.splat.active = true;
+    state.splat.life = 1.3;
+    state.splat.x = world.frogX;
+    state.splat.y = frogY();
+    splatSound();
+    setMessage("SPLAT!! 🫠 The frog became frog-jam. Press Reset to try again!", "bad");
+    // disable choices
+    UI.choiceBtns.forEach(b=>b.disabled=true);
+  }
+
+  function submitChoice(i){
+    if (!state.running || state.lockChoices) return;
+    state.lockChoices = true;
+
+    const picked = state.choices[i];
+    const ans = state.question.ans;
+
+    markChoices(state.correctIndex, i);
+
+    if (picked === ans){
+      setTimeout(onCorrect, 250);
+    } else {
+      setTimeout(()=>onWrong(`Nope! It was ${ans}.`), 350);
+    }
+  }
+
+  // ---------- Drawing ----------
+  function roundRect(x, y, w, h, r, fill){
+    const rr = Math.min(r, w/2, h/2);
+    g.beginPath();
+    g.moveTo(x+rr, y);
+    g.arcTo(x+w, y, x+w, y+h, rr);
+    g.arcTo(x+w, y+h, x, y+h, rr);
+    g.arcTo(x, y+h, x, y, rr);
+    g.arcTo(x, y, x+w, y, rr);
+    if (fill) g.fill();
+  }
+
+  function drawBackground(){
+    // top grass
+    g.fillStyle = "#7ee28d";
+    g.fillRect(0, 0, canvas.width, world.topGrassH);
+
+    // road
+    g.fillStyle = "#3a3a3a";
+    g.fillRect(0, world.roadTopY, canvas.width, world.roadH);
+
+    // bottom grass
+    g.fillStyle = "#76dd88";
+    g.fillRect(0, world.roadTopY + world.roadH, canvas.width, canvas.height - (world.roadTopY + world.roadH));
+
+    // lane dashes
+    g.strokeStyle = "rgba(255,255,255,0.65)";
+    g.lineWidth = 4;
+    g.setLineDash([18, 14]);
+    for (let i=1;i<world.lanes;i++){
+      const y = world.roadTopY + world.laneH*i;
+      g.beginPath();
+      g.moveTo(0, y);
+      g.lineTo(canvas.width, y);
+      g.stroke();
+    }
+    g.setLineDash([]);
+
+    // finish strip at top
+    g.fillStyle = "#ffffff";
+    g.fillRect(world.frogX - 40, 6, 80, 10);
+    for (let i=0;i<10;i++){
+      g.fillStyle = i%2 ? "#111" : "#fff";
+      g.fillRect(world.frogX - 40 + i*8, 6, 8, 10);
+    }
+
+    // some flowers
+    for (let i=0;i<14;i++){
+      const x = (i*63 + 30) % canvas.width;
+      const y = 30 + (i%3)*16;
+      g.fillStyle = ["#ff6b6b","#ffd166","#4dabf7"][i%3];
+      g.beginPath(); g.arc(x, y, 4, 0, Math.PI*2); g.fill();
+      g.fillStyle = "#2f9e44";
+      g.fillRect(x-1, y+4, 2, 10);
+    }
+  }
+
+  function drawCar(car){
+    const x = car.x, y = car.laneY;
+    const w = car.w, h = car.h;
+
+    // body
+    g.fillStyle = `hsl(${car.hue} 85% 55%)`;
+    roundRect(x, y, w, h, 10, true);
+
+    // windshield depends on direction
+    g.fillStyle = "rgba(255,255,255,0.55)";
+    const wx = car.dir === 1 ? x + w*0.62 : x + w*0.10;
+    roundRect(wx, y + 6, w*0.28, h-12, 8, true);
+
+    // wheels
+    g.fillStyle = "#111";
+    g.beginPath(); g.arc(x + 18, y + h, 9, 0, Math.PI*2); g.fill();
+    g.beginPath(); g.arc(x + w - 18, y + h, 9, 0, Math.PI*2); g.fill();
+
+    // silly face near the front
+    if (car.goofy){
+      const fx = car.dir === 1 ? x + w*0.22 : x + w*0.78;
+      g.fillStyle = "rgba(0,0,0,0.75)";
+      g.beginPath(); g.arc(fx-6, y + h*0.45, 4, 0, Math.PI*2); g.fill();
+      g.beginPath(); g.arc(fx+6, y + h*0.45, 4, 0, Math.PI*2); g.fill();
+      g.strokeStyle = "rgba(0,0,0,0.6)";
+      g.lineWidth = 2;
+      g.beginPath();
+      g.arc(fx, y + h*0.62, 10, 0, Math.PI);
+      g.stroke();
+    }
+  }
+
+  function drawFrog(){
+    if (state.splatted) return;
+    const x = world.frogX;
+    const y = frogY();
+
+    // shadow
+    g.fillStyle = "rgba(0,0,0,0.15)";
+    g.beginPath();
+    g.ellipse(x, y+28, 26, 10, 0, 0, Math.PI*2);
+    g.fill();
+
+    // body
+    g.fillStyle = "#2dd36f";
+    g.beginPath();
+    g.ellipse(x, y+10, 26, 22, 0, 0, Math.PI*2);
+    g.fill();
+
+    // belly
+    g.fillStyle = "rgba(255,255,255,0.55)";
+    g.beginPath();
+    g.ellipse(x, y+16, 16, 12, 0, 0, Math.PI*2);
+    g.fill();
+
+    // eyes
+    g.fillStyle = "#2dd36f";
+    g.beginPath();
+    g.arc(x-14, y-6, 10, 0, Math.PI*2);
+    g.arc(x+14, y-6, 10, 0, Math.PI*2);
+    g.fill();
+
+    g.fillStyle = "#fff";
+    g.beginPath();
+    g.arc(x-14, y-6, 6, 0, Math.PI*2);
+    g.arc(x+14, y-6, 6, 0, Math.PI*2);
+    g.fill();
+
+    g.fillStyle = "#111";
+    g.beginPath();
+    g.arc(x-12, y-6, 2.6, 0, Math.PI*2);
+    g.arc(x+16, y-6, 2.6, 0, Math.PI*2);
+    g.fill();
+
+    // smile
+    g.strokeStyle = "rgba(0,0,0,0.55)";
+    g.lineWidth = 2;
+    g.beginPath();
+    g.arc(x, y+16, 10, 0, Math.PI);
+    g.stroke();
+  }
+
+  function drawSplat(){
+    if (!state.splat.active) return;
+    const {x,y} = state.splat;
+
+    g.save();
+    g.globalAlpha = 0.95;
+    g.fillStyle = "#ff4d4d";
+    g.beginPath();
+    g.ellipse(x, y+22, 46, 18, 0, 0, Math.PI*2);
+    g.fill();
+
+    g.fillStyle = "#ff6b6b";
+    for (let i=0;i<10;i++){
+      const ang = (i/10)*Math.PI*2;
+      const rr = 26 + (i%3)*8;
+      const bx = x + Math.cos(ang)*rr;
+      const by = y+18 + Math.sin(ang)*rr*0.6;
+      g.beginPath();
+      g.arc(bx, by, 6 + (i%4), 0, Math.PI*2);
+      g.fill();
+    }
+
+    g.fillStyle = "#111";
+    g.font = "900 34px system-ui, sans-serif";
+    g.fillText("SPLAT!", x-70, y-25);
+    g.restore();
+  }
+
+  function drawHUD(){
+    // top banner
+    g.fillStyle = "rgba(255,255,255,0.75)";
+    roundRect(16, 14, 360, 44, 14, true);
+    g.fillStyle = "#163a2b";
+    g.font = "900 18px system-ui, sans-serif";
+    g.fillText(`Cross the road: 10 right!`, 30, 42);
+
+    // progress bar vertical-ish indicator
+    g.fillStyle = "rgba(255,255,255,0.75)";
+    roundRect(395, 14, 490, 44, 14, true);
+    const p = state.correctCount / state.needed;
+    g.fillStyle = "#2dd36f";
+    roundRect(407, 26, 466*p, 20, 10, true);
+    g.strokeStyle = "rgba(0,0,0,0.12)";
+    g.lineWidth = 1;
+    g.strokeRect(407, 26, 466, 20);
+
+    g.fillStyle = "#163a2b";
+    g.font = "900 14px system-ui, sans-serif";
+    g.fillText(`${Math.round(p*100)}%`, 840, 41);
+
+    // arrows showing direction
+    g.font = "900 16px system-ui, sans-serif";
+    g.fillText("⬆️", world.frogX-6, canvas.height-8);
+  }
+
+  // ---------- Game loop ----------
+  function rectOverlap(a,b){
+    return (a.x < b.x + b.w &&
+            a.x + a.w > b.x &&
+            a.y < b.y + b.h &&
+            a.y + a.h > b.y);
+  }
+
+  function tick(now){
+    const dt = (now - state.lastT) / 1000;
+    state.lastT = now;
+
+    // timer
+    if (state.running){
+      state.timeLeft -= dt;
+      if (state.timeLeft <= 0){
+        splatFrog();
+      }
+    }
+
+    // hop animation
+    if (state.hopAnim.active){
+      state.hopAnim.t += dt * 3.0;
+      if (state.hopAnim.t >= 1){
+        state.hopAnim.t = 1;
+        state.hopAnim.active = false;
+      }
+    }
+
+    // move cars + collision if frog is in road
+    const speed = state.baseCarSpeed * state.carSpeedMult;
+    const fx = world.frogX;
+    const fy = frogY();
+    const frogBox = { x: fx-22, y: fy-10, w: 44, h: 44 };
+    const frogLane = laneIndexForY(fy);
+
+    for (const car of state.cars){
+      // lane-specific small variance
+      const laneBoost = 0.9 + car.lane * 0.06;
+      car.x += car.dir * speed * laneBoost * dt;
+
+      // wrap
+      if (car.dir === 1 && car.x > canvas.width + 160) car.x = -car.w - randInt(40,220);
+      if (car.dir === -1 && car.x < -car.w - 160) car.x = canvas.width + randInt(40,220);
+
+      // collision only if frog on road + same lane-ish
+      if (state.running && !state.splatted && frogLane !== -1 && car.lane === frogLane){
+        const carBox  = { x: car.x, y: car.laneY, w: car.w, h: car.h+10 };
+        if (rectOverlap(frogBox, carBox)){
+          splatFrog();
+        }
+      }
+    }
+
+    // draw
+    g.clearRect(0,0,canvas.width,canvas.height);
+    drawBackground();
+    for (const car of state.cars) drawCar(car);
+    drawHUD();
+    drawFrog();
+    drawSplat();
+
+    // time bar UI
+    const t = clamp(state.timeLeft / state.timeLimit, 0, 1);
+    UI.timeFill.style.width = `${t*100}%`;
+
+    requestAnimationFrame(tick);
+  }
+
+  // ---------- Reset / Start ----------
+  function resetGame(){
+    state.correctCount = 0;
+    state.carSpeedMult = 1.0;
+    state.timeLimit = 6.0;
+    state.timeLeft = state.timeLimit;
+    state.running = true;
+    state.splatted = false;
+    state.win = false;
+    state.splat.active = false;
+    state.hopAnim.active = false;
+    state.lockChoices = false;
+    resetCars();
+    makeQuestion();
+    updateStats();
+    setMessage("Pick the right answer to help the frog hop across!", "");
+  }
+
+  // ---------- Events ----------
+  UI.choiceBtns.forEach((btn)=>{
+    btn.addEventListener("click", ()=>{
+      ensureAudio(); // unlock audio on click
+      submitChoice(Number(btn.dataset.i));
+    });
+  });
+
+  UI.reset.addEventListener("click", resetGame);
+
+  UI.modeRadios.forEach(r => r.addEventListener("change", ()=>{
+    const checked = UI.modeRadios.find(x=>x.checked);
+    state.mode = checked ? checked.value : "add1";
+    resetGame();
+  }));
+
+  UI.soundBtn.addEventListener("click", ()=>{
+    audioOn = !audioOn;
+    UI.soundBtn.textContent = audioOn ? "🔊 Sound: ON" : "🔇 Sound: OFF";
+    if (audioOn) { ensureAudio(); beep(660,0.06,"sine",0.06); }
+  });
+
+  canvas.addEventListener("pointerdown", ()=>ensureAudio());
+
+  // ---------- Go ----------
+  resetGame();
+  requestAnimationFrame(tick);
+})();
+</script>
+</body>
+</html>
